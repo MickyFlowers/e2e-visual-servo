@@ -1,0 +1,36 @@
+model:
+  target: models.policy.Policy
+  params:
+    lr: 1e-4
+    dino_model: "dinov2_vitg14"
+    use_local: True
+    transformer_config:
+      target: models.attention.models.Transformer
+      params:
+        out_dim: 128
+        d_model_en: 384
+        d_model_de: 384
+        d_inner: 128
+        n_layers: 4
+        n_head: 8
+        d_k: 64
+        d_v: 64
+        dropout: 0.0
+        n_position: 5000
+        scale_emb: True
+
+trainer:
+  gpus: 1
+  monitor: "val/loss"
+  accumulate_grad_batches: 8
+  dataset: 
+    target: data.vs_dataset.PklDataset
+    params:
+      data_root: "/home/cyx/project/dataset/policy/sample/data/"
+  dataloader:
+    batch_size: 8
+    num_workers: 4
+  logger: 
+    target: pytorch_lightning.loggers.TensorBoardLogger
+    params:
+      save_dir: "logs/"
