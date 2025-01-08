@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 
 from models.attention.models import TransformerBlock
 from models.dino import Dinov2
-from utils import instantiate_from_config
+from utils.utils import instantiate_from_config
 
 
 class ToolAdaptive(pl.LightningModule):

@@ -2,7 +2,7 @@ import os
 import argparse
 import datetime
 from omegaconf import OmegaConf
-from utils import instantiate_from_config
+from utils.utils import instantiate_from_config
 import pytorch_lightning as L
 from pytorch_lightning.trainer import Trainer
 from pytorch_lightning.callbacks import Callback
