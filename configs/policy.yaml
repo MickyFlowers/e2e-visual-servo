@@ -2,6 +2,7 @@ model:
   target: models.policy.Policy
   params:
     lr: 1e-4
+    # ckpt_path: logs/policy/2025-01-08T19-35-18/checkpoints/checkpoints-v1.ckpt
     dino_model: "dinov2_vitg14"
     use_local: True
     transformer_config:
@@ -21,12 +22,13 @@ model:
 
 trainer:
   gpus: 1
-  monitor: "val/loss"
+  monitor: "train/total_loss"
   accumulate_grad_batches: 8
+  every_n_train_steps: 500
   dataset: 
     target: data.vs_dataset.PklDataset
     params:
-      data_root: "/home/cyx/project/dataset/policy/sample/data/"
+      data_root: "/home/cyx/project/policy/sample/data/"
   dataloader:
     batch_size: 8
     num_workers: 4
@@ -34,3 +36,4 @@ trainer:
     target: pytorch_lightning.loggers.TensorBoardLogger
     params:
       save_dir: "logs/"
+

@@ -52,16 +52,18 @@ if __name__ == "__main__":
         logger_configs["params"]["version"],
         "checkpoints",
     )
+    logger_configs["params"]["version"] = os.path.join(
+        logger_configs["params"]["version"], "tensorboard"
+    )
     default_callback_config = {
         "checkpoint_callback_configs": {
             "target": "pytorch_lightning.callbacks.ModelCheckpoint",
             "params": {
                 "dirpath": ckptdir,
-                "filename": "checkpoints-{epoch:03}",
-                "verbose": True,
-                "monitor": trainer_configs["monitor"],
-                "save_top_k": 3,
+                "filename": "checkpoints",
+                "verbose": False,
                 "save_weights_only": True,
+                "save_last": True,
             },
         },
         "save_configs_callback_configs": {
@@ -69,7 +71,24 @@ if __name__ == "__main__":
             "params": {"configs": configs},
         },
     }
-
+    checkpoint_callback_configs = default_callback_config[
+        "checkpoint_callback_configs"
+    ]["params"]
+    if trainer_configs.get("monitor") is not None:
+        checkpoint_callback_configs.update(
+            {"monitor": trainer_configs["monitor"], "save_top_k": 3}
+        )
+    if trainer_configs.get("every_n_epochs") is not None:
+        checkpoint_callback_configs.update(
+            {"every_n_epochs": trainer_configs["every_n_epochs"]}
+        )
+    elif trainer_configs.get("every_n_train_steps") is not None:
+            checkpoint_callback_configs.update(
+                {"every_n_train_steps": trainer_configs["every_n_train_steps"]}
+            )
+    default_callback_config["checkpoint_callback_configs"].update(
+        {"params": checkpoint_callback_configs}
+    )
     # trainer config
     trainer_kwargs = {
         "logger": instantiate_from_config(logger_configs),
@@ -95,7 +114,6 @@ if __name__ == "__main__":
     )
     # initialize model
     model = instantiate_from_config(model_configs)
-    # initialize dataset
 
     trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
     trainer.fit(model, dataloader)

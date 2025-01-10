@@ -17,6 +17,7 @@ class Policy(pl.LightningModule):
         self,
         lr,
         transformer_config,
+        ckpt_path=None,
         dino_model="dinov2_vitg14",
         use_local=True,
         *args,
@@ -49,6 +50,11 @@ class Policy(pl.LightningModule):
             nn.LeakyReLU(inplace=True),
             nn.Linear(dim_action, 6, bias=False),
         )
+        if ckpt_path is not None:
+            sd = torch.load(ckpt_path, map_location="cpu")["state_dict"]
+            self.load_state_dict(sd, strict=True)
+            print(f"Restore state dict from {ckpt_path}")
+        self.save_hyperparameters()
 
     def forward(self, cur_img: Tensor, tar_img: Tensor):
         b, _, _, _ = cur_img.shape
@@ -74,11 +80,15 @@ class Policy(pl.LightningModule):
         tar_img = self.reshape(batch["desired_rgbs"]) * 2.0 - 1.0
         depth_hint = batch["depth_hint"]
         gt_dT = torch.bmm(torch.inverse(batch["desired_poses"]), batch["current_poses"])
-        loss = self.calc_loss(cur_img, tar_img, depth_hint, gt_dT)
-        self.log_dict(loss, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-        return loss["total_loss"]
+        loss, loss_dict = self.calc_loss(cur_img, tar_img, depth_hint, gt_dT)
+        self.log_dict(
+            loss_dict, prog_bar=False, logger=True, on_step=True, on_epoch=True
+        )
+        return loss
 
-    def calc_loss(self, cur_img: Tensor, tar_img: Tensor, depth_hint, gt_dT):
+    def calc_loss(
+        self, cur_img: Tensor, tar_img: Tensor, depth_hint, gt_dT, phase="train"
+    ):
         ln_norm, dir = self(cur_img, tar_img)
         gt_v, gt_w = self.pbvs(gt_dT)
         gt_v_dir_noscale = torch.cat([gt_v / depth_hint[:, None], gt_w], dim=-1)
@@ -86,10 +96,10 @@ class Policy(pl.LightningModule):
         norm_loss = F.l1_loss(ln_norm, rev_exp_lin(gt_v_dir_noscale_norm))
         dir_loss = 1 - F.cosine_similarity(gt_v_dir_noscale, dir).mean()
         total_loss = norm_loss * 0.2 + dir_loss
-        loss = {
-            "norm_loss": norm_loss,
-            "dir_loss": dir_loss,
-            "total_loss": total_loss,
+        loss_dict = {
+            f"{phase}/norm_loss": norm_loss,
+            f"{phase}/dir_loss": dir_loss,
+            f"{phase}/total_loss": total_loss,
         }
         # if total_loss < 1:
         #     print("check loss")
@@ -100,7 +110,7 @@ class Policy(pl.LightningModule):
         # cv2.imshow("tar_img", tar_img_show)
         # cv2.waitKey(0)
 
-        return loss
+        return total_loss, loss_dict
 
     def pbvs(self, dT: Tensor):
 
