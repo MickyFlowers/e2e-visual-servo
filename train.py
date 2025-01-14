@@ -45,7 +45,8 @@ if __name__ == "__main__":
 
     logger_configs = trainer_configs.get("logger", OmegaConf.create())
     logger_configs["params"]["name"] = name
-    logger_configs["params"]["version"] = now
+    # logger_configs["params"]["version"] = now
+    logger_configs["params"]["version"] = "dagger"
     ckptdir = os.path.join(
         logger_configs["params"]["save_dir"],
         logger_configs["params"]["name"],
@@ -83,9 +84,9 @@ if __name__ == "__main__":
             {"every_n_epochs": trainer_configs["every_n_epochs"]}
         )
     elif trainer_configs.get("every_n_train_steps") is not None:
-            checkpoint_callback_configs.update(
-                {"every_n_train_steps": trainer_configs["every_n_train_steps"]}
-            )
+        checkpoint_callback_configs.update(
+            {"every_n_train_steps": trainer_configs["every_n_train_steps"]}
+        )
     default_callback_config["checkpoint_callback_configs"].update(
         {"params": checkpoint_callback_configs}
     )

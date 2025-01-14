@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 import math
 from utils.utils import *
+from models import vel_denorm
 from torch.autograd import gradcheck
 import cv2
 
@@ -17,6 +18,7 @@ class Policy(pl.LightningModule):
         self,
         lr,
         transformer_config,
+        norm_loss_wight,
         ckpt_path=None,
         dino_model="dinov2_vitg14",
         use_local=True,
@@ -25,6 +27,7 @@ class Policy(pl.LightningModule):
     ):
         super().__init__(*args, **kwargs)
         self.learning_rate = lr
+        self.norm_loss_weight = norm_loss_wight
         self.encoder = Dinov2(dino_model, use_local=use_local).requires_grad_(False)
         dim_action_token = transformer_config["params"]["d_model_de"]
         dim_action = transformer_config["params"]["out_dim"]
@@ -95,7 +98,7 @@ class Policy(pl.LightningModule):
         gt_v_dir_noscale_norm = torch.norm(gt_v_dir_noscale, dim=-1, keepdim=True)
         norm_loss = F.l1_loss(ln_norm, rev_exp_lin(gt_v_dir_noscale_norm))
         dir_loss = 1 - F.cosine_similarity(gt_v_dir_noscale, dir).mean()
-        total_loss = norm_loss * 0.2 + dir_loss
+        total_loss = norm_loss * self.norm_loss_weight + dir_loss
         loss_dict = {
             f"{phase}/norm_loss": norm_loss,
             f"{phase}/dir_loss": dir_loss,
@@ -118,6 +121,25 @@ class Policy(pl.LightningModule):
         v = -torch.bmm(dT[:, :3, :3].transpose(1, 2), dT[:, :3, 3:4]).squeeze(-1)
         w = -u
         return v, w
+
+    @torch.no_grad()
+    def cal_vel(self, cur_img, tar_img, depth_hint, norm_xy):
+        ln_norm, vel_dir_noscale = self(cur_img, tar_img)
+        vel_norm = exp_lin(ln_norm)
+        vel_noscale = F.normalize(vel_dir_noscale, dim=-1) * vel_norm
+        pred_v = vel_noscale[..., :3]  # (B, 3)
+        pred_w = vel_noscale[..., 3:]  # (B, 3)
+
+        pred_dR = axis_angle_to_matrix(-pred_w)
+        pred_dt = torch.bmm(pred_dR, -pred_v.unsqueeze(-1)).squeeze(-1)
+        pred_dT = pred_dR.new_zeros(pred_dR.shape[0], 4, 4)
+        pred_dT[:, :3, :3] = pred_dR
+        pred_dT[:, :3, 3] = pred_dt
+        K_real = vel_denorm.infer_intrinsic_from_norm_xy_map(norm_xy)
+        dT = vel_denorm.denorm_torch(dcT_norm=pred_dT, d_star=depth_hint, K_real=K_real)
+        pred_v, pred_w = self.pbvs(dT)
+        pred_vel = torch.cat([pred_v, pred_w], dim=-1)
+        return pred_vel
 
     def configure_optimizers(self):
         params = (

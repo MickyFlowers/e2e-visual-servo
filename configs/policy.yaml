@@ -1,8 +1,9 @@
 model:
   target: models.policy.Policy
   params:
-    lr: 1e-4
-    # ckpt_path: logs/policy/2025-01-08T19-35-18/checkpoints/checkpoints-v1.ckpt
+    lr: 1e-5
+    norm_loss_wight: 0.05
+    ckpt_path: logs/policy/2025-01-11T13-33-07/checkpoints/checkpoints.ckpt
     dino_model: "dinov2_vitg14"
     use_local: True
     transformer_config:
@@ -19,6 +20,7 @@ model:
         dropout: 0.0
         n_position: 5000
         scale_emb: True
+        
 
 trainer:
   gpus: 1
