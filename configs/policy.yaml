@@ -1,9 +1,9 @@
 model:
   target: models.policy.Policy
   params:
-    lr: 1e-5
-    norm_loss_wight: 0.05
-    ckpt_path: logs/policy/2025-01-11T13-33-07/checkpoints/checkpoints.ckpt
+    lr: 1e-4
+    norm_loss_wight: 1.0
+    # ckpt_path: logs/policy/dagger/checkpoints/checkpoints.ckpt
     dino_model: "dinov2_vitg14"
     use_local: True
     transformer_config:
@@ -23,14 +23,14 @@ model:
         
 
 trainer:
-  gpus: 1
+  devices: 1
   monitor: "train/total_loss"
   accumulate_grad_batches: 8
   every_n_train_steps: 500
   dataset: 
     target: data.vs_dataset.PklDataset
     params:
-      data_root: "/home/cyx/project/policy/sample/data/"
+      data_root: "/home/cyx/project/policy/dagger_sample/data/"
   dataloader:
     batch_size: 8
     num_workers: 4

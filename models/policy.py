@@ -60,6 +60,7 @@ class Policy(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, cur_img: Tensor, tar_img: Tensor):
+
         b, _, _, _ = cur_img.shape
         with torch.no_grad():
             cur_dino_feature = self.encoder(cur_img)

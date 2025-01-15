@@ -27,7 +27,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/policy.yaml")
-    parser = Trainer.add_argparse_args(parser)
+    # parser = Trainer.add_argparse_args(parser)
 
     opt, unknown = parser.parse_known_args()
     if opt.config:
@@ -41,9 +41,9 @@ if __name__ == "__main__":
 
     model_configs = configs.get("model", OmegaConf.create())
     trainer_configs = configs.get("trainer", OmegaConf.create())
-    dataset_configs = trainer_configs.get("dataset", OmegaConf.create())
+    dataset_configs = trainer_configs.pop("dataset", OmegaConf.create())
 
-    logger_configs = trainer_configs.get("logger", OmegaConf.create())
+    logger_configs = trainer_configs.pop("logger", OmegaConf.create())
     logger_configs["params"]["name"] = name
     # logger_configs["params"]["version"] = now
     logger_configs["params"]["version"] = "dagger"
@@ -65,6 +65,7 @@ if __name__ == "__main__":
                 "verbose": False,
                 "save_weights_only": True,
                 "save_last": True,
+                "enable_version_counter": False,
             },
         },
         "save_configs_callback_configs": {
@@ -79,14 +80,17 @@ if __name__ == "__main__":
         checkpoint_callback_configs.update(
             {"monitor": trainer_configs["monitor"], "save_top_k": 3}
         )
+        trainer_configs.pop("monitor")
     if trainer_configs.get("every_n_epochs") is not None:
         checkpoint_callback_configs.update(
             {"every_n_epochs": trainer_configs["every_n_epochs"]}
         )
+        trainer_configs.pop("every_n_epochs")
     elif trainer_configs.get("every_n_train_steps") is not None:
         checkpoint_callback_configs.update(
             {"every_n_train_steps": trainer_configs["every_n_train_steps"]}
         )
+        trainer_configs.pop("every_n_train_steps")
     default_callback_config["checkpoint_callback_configs"].update(
         {"params": checkpoint_callback_configs}
     )
@@ -101,20 +105,20 @@ if __name__ == "__main__":
     trainer_configs["accelerator"] = "gpu"
     trainer_configs["strategy"] = "ddp"
 
-    if not "gpus" in trainer_configs:
-        del trainer_configs["gpus"]
+    if not "devices" in trainer_configs:
+        del trainer_configs["devices"]
         del trainer_configs["strategy"]
         print("using cpu")
     else:
-        gpuinfo = trainer_configs["gpus"]
+        gpuinfo = trainer_configs["devices"]
         print(f"using gpu: {gpuinfo}")
-    trainer_opt = argparse.Namespace(**trainer_configs)
+    # trainer_opt = argparse.Namespace(**trainer_configs)
     dataset = instantiate_from_config(dataset_configs)
     dataloader = DataLoader(
-        dataset, **(trainer_configs.get("dataloader", OmegaConf.create()))
+        dataset, **(trainer_configs.pop("dataloader", OmegaConf.create()))
     )
     # initialize model
     model = instantiate_from_config(model_configs)
 
-    trainer = Trainer.from_argparse_args(trainer_opt, **trainer_kwargs)
+    trainer = Trainer(**trainer_configs, **trainer_kwargs)
     trainer.fit(model, dataloader)
